@@ -24,7 +24,7 @@ pub fn check_end_digits(a: u128, n: u32) -> bool {
 }
 
 /// Convert usize to array of digits. From Shepmaster on stackoverflow.com/questions/41536479/how-do-i-split-an-integer-into-individual-digits
-pub fn digits(n: u128) -> Vec<usize> {
+fn digits(n: u128) -> Vec<usize> {
     fn digits_inner(n: u128, xs: &mut Vec<usize>) {
         if n >= 10 {
             digits_inner(n / 10, xs);
