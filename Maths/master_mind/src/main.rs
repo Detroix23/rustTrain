@@ -9,6 +9,9 @@ use std::io;
 
 mod checks;
 
+/// Game player. True if the human player want to play and show is natural inferiority, False to let a bot play. 
+pub const GAME_HUMAN: bool = true;
+
 /// Define how many "colors" values there is.
 pub const POOL_SIZE: u32 = 8u32;
 /// Define the length of the hidden set.
@@ -21,22 +24,29 @@ pub const CORRECT_PLACEMENT: &str = "⚪";
 /// Graphical - What to print when a value is good.
 pub const CORRECT_VALUE: &str = "🔴";
 
+/// Debug - Activate
+pub const DEBUG_ACTIVATED: bool = true;
 
-
-pub fn main() {
-    println!("# MASTER MIND");
-    println!("Values: POOL_SIZE = {POOL_SIZE}, SET_LENGTH = {SET_LENGTH}, MAX_TRIES = {MAX_TRIES}");
-
-    // Generating the set.
+/// Generate a set. Random choices.
+pub fn generate_random_set() -> Vec<u32>{
     let mut set_hidden: Vec<u32> = Vec::new();
     while set_hidden.len() < SET_LENGTH {
         set_hidden.push(rand::rng().random_range(1u32..=POOL_SIZE));
     }
+    set_hidden
+}
 
-    println!("set: {:?}", set_hidden);
+
+/// Execute the game where the human player tries to guess.
+pub fn game_manual() -> bool {
+    // Generating the set.
+    let set_hidden: Vec<u32> = generate_random_set();
+    
+
+    if DEBUG_ACTIVATED {println!("- DEBUG - Hidden set: {:?}", set_hidden);}
 
     // User game.
-    println!("## Enter your guesses seperated by ','. Ex: *1, 2, 3, 4*.");
+    println!("\n## Enter your guesses. Seperated by ','. Ex: `1, 2, 3, 4`.");
 
     let mut guesses: u32 = 1;
     let mut found: bool = false;
@@ -48,7 +58,7 @@ pub fn main() {
         let mut user_guess_set: Vec<u32> = Vec::new();
         let mut cheat_jojo: bool = false;
 
-        println!("Guess {}", guesses);
+        println!("- Guess {}", guesses);
         while !user_guess_correct {
             // Read
             io::stdin()
@@ -63,37 +73,110 @@ pub fn main() {
             // Validate input
             if user_guess_set.len() == SET_LENGTH {
                 user_guess_correct = true;
-            } else if user_guess_set_string == String::from("jojo") { 
+            } else if DEBUG_ACTIVATED && (user_guess_set_string == String::from("jojo")) {
                 // Cheat - Instant win.
-                println!("Cheat - Instant win");
+                println!("Cheat - Instant win.");
                 cheat_jojo = true;
                 user_guess_correct = true;
-            } else if user_guess_set_string == String::from("omniscia") {
+            } else if DEBUG_ACTIVATED && (user_guess_set_string == String::from("omniscia")) {
                 // Cheat - Autocorrect input.
+                println!("Cheat - Auto-correct input.");
                 user_guess_set = set_hidden.clone();
                 user_guess_correct = true;
             } else {
-                println!("(!) Warning - Invalid input; please type again.");
+                println!("(!) Warning - Invalid input; Input difference: {}", SET_LENGTH as i32 - user_guess_set.len() as i32);
                 user_guess_set_string = String::new();
             }
         }
-        println!("set: {:?}", user_guess_set);
 
         // Comparing.
-        let comparison_results: Vec<u8> = checks::similarities(set_hidden.clone(), user_guess_set);
-        println!("comparison: {:?}", comparison_results);
+        let comparison_results: [u32; 2] = checks::similarities(&set_hidden, &user_guess_set);
+        
+        // UI
+        println!("{} {} {} {} - {:?}", comparison_results[0], CORRECT_PLACEMENT, comparison_results[1], CORRECT_VALUE, user_guess_set);
 
         // End turn.
-        found = (comparison_results.iter().sum::<u8>() as usize == SET_LENGTH * 2usize) | cheat_jojo;
+        found = (comparison_results[0] as usize == SET_LENGTH) | cheat_jojo;
 
         guesses += 1;
     } 
-    println!();
+    println!("\n## Game ended.");
     if found {
-        println!("GG bro.");
+        println!("- You win. GG bro.");
     } else {
-        println!("Take the L, bozo. You ran out of tries. Solution was {:?}", set_hidden);
+        println!("- You lost. You ran out of tries. Take the L, bozo.");
     }
+    println!("Hidden set was {:?}", set_hidden);
+    println!();
 
+    found
+}
 
+/// Execute the game for a bot.
+/*
+pub fn game_robot() -> bool {
+    // Generating the set.
+    let set_hidden: Vec<u32> = generate_random_set();
+    
+
+    println!("- Hidden set, to the bot: {:?}", set_hidden);
+
+    // User game.
+    println!("\n## Bot will start entering guesses.");
+
+    let mut guesses: u32 = 1;
+    let mut found: bool = false;
+
+    while guesses <= MAX_TRIES && !found {
+        // User input.
+        let mut user_guess_correct: bool = false;
+        let mut user_guess_set_string: String = String::new();
+        let mut user_guess_set: Vec<u32> = Vec::new();
+        println!("- Guess {}", guesses);
+
+        // Bot guess
+        //// Undef function.
+
+        // Comparing.
+        let comparison_results: [u32; 2] = checks::similarities(&set_hidden, &user_guess_set);
+        
+        // UI
+        println!("{} {} {} {} - {:?}", comparison_results[0], CORRECT_PLACEMENT, comparison_results[1], CORRECT_VALUE, user_guess_set);
+
+        // End turn.
+        found = comparison_results[0] as usize == SET_LENGTH;
+
+        guesses += 1;
+    } 
+    println!("\n## Game ended.");
+    if found {
+        println!("- You win. GG bro.");
+    } else {
+        println!("- You lost. You ran out of tries. Take the L, bozo.");
+    }
+    println!("Hidden set was {:?}", set_hidden);
+    println!();
+
+    found
+}
+*/
+
+/// Run the game, according to settings, debug and player.
+pub fn main() {
+    println!("# MASTER MIND");
+
+    println!("## Initializing");
+    if POOL_SIZE < 16 {
+        print!("- Pool of values: 1");
+        for value in 2..=POOL_SIZE {
+            print!(", {value}");
+        }
+        println!();
+        } else {
+        println!("- Pool of values (inclusive): 1 .. {}", POOL_SIZE);
+    }
+    println!("- Set length: {}", SET_LENGTH);
+    println!("- Maximum tries: {}", MAX_TRIES);
+
+    game_manual();
 }

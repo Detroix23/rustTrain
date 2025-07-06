@@ -12,17 +12,18 @@ pub fn convert_input_set(set_string: String) -> Vec<u32> {
 
 /// Compute and compare 2 sets and tells how many exact (2) and correct values (1) there are; or nothing (0).
 /// The sets must be of same size.
-pub fn similarities(set_base: Vec<u32>, set_comparison: Vec<u32>) -> Vec<u8> {
-	let mut results: Vec<u8> = Vec::new();
+/// Returns an array: Oth is the exacts, 1st is the good value.
+pub fn similarities(set_base: &Vec<u32>, set_comparison: &Vec<u32>) -> [u32; 2] {
+	let mut results: [u32; 2] = [0u32, 0u32];
 	let mut confounded_values: Vec<u32> = Vec::new();
 	let mut i: usize = 0;
 	while i < set_comparison.len() {
 		// Exact (2).
 		if set_base[i] == set_comparison[i] {
-			results.push(2u8);
+			results[0] += 1u32;
 		// Existing value (1), check already found
 		} else if confounded_values.contains(&set_comparison[i]) {
-			results.push(1u8);
+			results[1] += 1u32;
 		// Existing value (1).
 		} else {
 			let mut value_exists: bool = false;
@@ -33,14 +34,11 @@ pub fn similarities(set_base: Vec<u32>, set_comparison: Vec<u32>) -> Vec<u8> {
 			}
 			if value_exists {
 				confounded_values.push(set_comparison[i]);
-				results.push(1u8);
-			} else {
-				results.push(0u8);
+				results[1] += 1u32;
 			}
 		}
 		i += 1;
 	}
 
-	results.sort_by(|a, b| b.cmp(a));
 	results
 }
