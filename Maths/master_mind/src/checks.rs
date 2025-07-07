@@ -4,7 +4,7 @@
 use regex::Regex;
 
 /// Structure defining a hint.
-#[derive(PartialEq)]
+#[derive(Eq, Hash, PartialEq, Clone)]
 pub struct Hint {
 	pub exact: u32,
 	pub exist: u32,

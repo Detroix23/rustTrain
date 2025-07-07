@@ -1,16 +1,17 @@
 // MASTER MIND
 // Bot search.
 
-use std::hint;
+
 
 // Import from Main.
-use crate::{POOL_SIZE, SET_LENGTH};
+use crate::{POOL_SIZE, SET_LENGTH, HashMap};
 // Import from Checks.
 use crate::{checks::{similarities, Hint}};
 
-pub struct WeightedHint {
-	pub hint: Hint,
-	pub weight: u32,
+/// Structure that stores infos on next probabilities and bits
+pub struct SetScore {
+	pub probability: f64,
+	pub bits: f64
 }
 
 /// Generate all possible combinations of set, according to main constant's.
@@ -59,7 +60,7 @@ pub fn combinations_hints() -> Vec<Hint> {
 		if iter_global < SET_LENGTH {
 			iter_global += 1;
 			let combinations_received: Vec<Vec<u32>> = combinations_sets_inner(iter_global);
-			// println!("\n====================Iter {iter_global} - NORMAL MODE=======================");
+			//println!("\n====================Iter {iter_global} - NORMAL MODE=======================");
 			
 			for combination in combinations_received {
 				for iter_local in 0..=2 {
@@ -69,21 +70,21 @@ pub fn combinations_hints() -> Vec<Hint> {
 				}	
 			}
 		} else {
-			// println!("\n====================Iter {iter_global} - INIT MOD=========================");
+			//println!("\n====================Iter {iter_global} - INIT MOD=========================");
 			for iter_local in 0..=2 {
 				let combination: Vec<u32> = vec![iter_local];
 				combinations_send.push(combination);
 			}
 		}
 		
-		// print!("{:?} ", combinations_send);
+		//print!("{:?} ", combinations_send);
 
 		combinations_send
 	}
 	let combinations: Vec<Vec<u32>> = combinations_sets_inner(1);
 
 	// Convert to Hint struct
-	let combinations_hints: Vec<Hint> = Vec::new();
+	let mut combinations_hints: Vec<Hint> = Vec::new();
 	for hint_vec in combinations {
 		let mut hint_hint: Hint = Hint {
 			exact: 0, 
@@ -97,37 +98,78 @@ pub fn combinations_hints() -> Vec<Hint> {
 				_ => hint_hint.null += 1
 			}
 		}
+
+		if !combinations_hints.contains(&hint_hint) {
+			combinations_hints.push(hint_hint);
+		}
 	}
 
 	combinations_hints
 }
 
-/// Compute for each hint pattern its probability of happening given one set, by going trought all possible set combinations.
+/// Find, for a given set, the number by set of hint-set that would correspond 
 /// Input: set = Given set, set_combinations = vector of all possible set,
-/// Returns: Vector of probabilities of each hints.
-pub fn set_hint_probabilities(set_origin: &Vec<u32>, set_combinations: &Vec<Vec<u32>>, set_hint: &Vec<Hint>) -> Vec<WeightedHint> {
-	let mut hint_quantities: Vec<WeightedHint> = Vec::new();
-	// Go throught all sets and count 
+/// Returns: HashMap of the quantity of each hint-set.
+pub fn set_hint_quantities(set_origin: &Vec<u32>, set_combinations: &Vec<Vec<u32>>, set_hints: &Vec<Hint>) -> HashMap<Hint, u32> {
+	// Init all hints
+	let mut hint_quantities: HashMap<Hint, u32> = HashMap::new();
+	for set_hint in set_hints {
+		hint_quantities.insert(set_hint.clone(), 0u32);
+		//println!("q, hint_quantities: {}; h: {}{} {}{} {}{}", hint_quantities.len(), set_hint.exact, "AC", set_hint.exist, "IS", set_hint.null, "NO");
+	}
+	/*
+	println!("Hint quantities init:");
+	for (hint, weight) in &hint_quantities {
+        print!("- {}# {}{} {}{} {}{}; ", weight, hint.exact, "AC", hint.exist, "IS", hint.null, "NO");
+    }
+	println!("q-set_hints (init): {}", set_hints.len());
+	println!("q-hint_quantities (init): {}", hint_quantities.len());
+	*/
+	// Go throught all sets
 	for set in set_combinations {
 		// Compare
 		let hint: Hint = similarities(&set_origin, &set);
-		// Add to vector, check if already exists
-		let mut found: bool = false;
-		let mut i_wh: usize = 0;
-		while i_wh < hint_quantities.len() && !found {
-			found = hint_quantities[i_wh].hint == hint;
-			i_wh += 1;
-		}
-		if found {
-			hint_quantities[i_wh - 1].weight += 1;
-		} else {
-			hint_quantities.push(WeightedHint { 
-				hint: hint,
-				weight: 1 
-			});
-		}
-
+		// Add to map
+		hint_quantities.insert(hint.clone(), hint_quantities[&hint] + 1);
 	}
 
 	hint_quantities
-} 
+}
+
+/// Compute for each hint-set its probability of happening and and bits of a set given its quantity map, by going trought all possible set combinations.
+pub fn set_hint_score(hint_quantities: HashMap<Hint, u32>) -> HashMap<Hint, SetScore> {
+	let mut hint_probabilities: HashMap<Hint, SetScore> = HashMap::new();
+	// Sum.
+	let mut total_sum: u32 = 0;
+	for (_, quantity) in &hint_quantities {
+		total_sum += quantity;
+	}
+	//println!("sum: {}", total_sum);
+	// Proba.
+	for (hint, quantity) in hint_quantities {
+		let probability: f64 = quantity as f64 / total_sum as f64;
+		let mut bits: f64 = 0.0_f64;
+		if probability != 0.0_f64 {
+			bits = -probability.log2();
+		} else {
+			bits = 0.0_f64;
+		}
+		let score: SetScore = SetScore {
+			probability,
+			bits
+		};
+		hint_probabilities.insert(hint, score);
+	}
+
+	hint_probabilities
+}
+
+/// Compute the entropy of a set, given its hint score. Allow a general score.
+pub fn set_entropy(hints_score: HashMap<Hint, SetScore>) -> f64 {
+	let mut entropy: f64 = 0.0f64;
+	for (_, scores) in hints_score {
+		entropy += scores.probability * scores.bits;
+	}
+
+	entropy
+}

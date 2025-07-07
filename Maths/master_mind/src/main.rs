@@ -6,8 +6,9 @@
 // Import
 use rand::Rng;
 use std::io;
+use std::collections::HashMap;
 
-use crate::{checks::Hint, search_v1::{combinations_hints, combinations_sets, set_hint_probabilities}};
+use crate::{checks::Hint, search_v1::{combinations_hints, combinations_sets, set_entropy, set_hint_quantities, set_hint_score, SetScore}};
 
 // Basic rules
 mod checks;
@@ -176,21 +177,42 @@ pub fn game_robot() -> bool {
 fn mode_test() {
     println!("## Feature-test mode");
 
-    println!("- Recursion test");
+    println!("### Recursion test");
     let _combinations_sets: Vec<Vec<u32>> = combinations_sets();
     let _combinations_hint: Vec<Hint> = combinations_hints();
-    // println!("Result: {:?}. # {}", _combinations_hint, _combinations_hint.len());
-    // println!("Result: {:?}. # {}", _combinations_sets, _combinations_sets.len());
-
-    println!("- Hints quantities and probabilities");
-    let _set: Vec<u32> = vec![1, 2, 3, 4];
-    println!("Set = {:?}", _set);
-    let _hint_quantities = set_hint_probabilities(&_set, &_combinations_sets, &_combinations_hint);
-    // Print hint quantities
-    println!("Hint quantities:");
-    for wh in _hint_quantities {
-        println!("- {}# {}{} {}{} {}{}", wh.weight, wh.hint.exact, CORRECT_PLACEMENT, wh.hint.exist, CORRECT_VALUE, wh.hint.null, CORRECT_NON);
+    /*
+    println!("Combination of hints:");
+    for hint in &_combinations_hint {
+        println!("- {}{} {}{} {}{}", hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
     }
+    println!("q: {}", _combinations_hint.len());
+    */
+    /*
+    println!("Combinations of sets: {:?}. # {}", _combinations_sets, _combinations_sets.len());
+    */
+
+    println!("\n### Hints quantities and probabilities");
+    let _set: Vec<u32> = vec![1, 1, 1, 1];
+    println!("Set = {:?}", _set);
+    // Print hint quantities
+    let _hint_quantities: HashMap<Hint, u32> = set_hint_quantities(&_set, &_combinations_sets, &_combinations_hint);
+    println!("Hint quantities:");
+    for (hint, weight) in &_hint_quantities {
+        println!("- q = {} -> {}{} {}{} {}{}", weight, hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
+    }
+    // println!("q: {}", _hint_quantities.len());
+    // Hint proba
+    println!("Hint probability:");
+    let _hint_score: HashMap<Hint, SetScore> = set_hint_score(_hint_quantities);
+    for (hint, score) in &_hint_score {
+        println!("- p = {:.2}%; b = {:.2}bits -> {}{} {}{} {}{}", score.probability * 100f64, score.bits,hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
+    }
+
+    // Set overhaul score
+    println!("Entropy:");
+    let _entropy = set_entropy(_hint_score);
+    println!("- E = {:.5}bits", {_entropy});
+
 }
 
 /// Run the game, according to settings, debug and player.
