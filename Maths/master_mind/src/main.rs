@@ -7,10 +7,18 @@
 use rand::Rng;
 use std::io;
 
-mod checks;
+use crate::{checks::Hint, search_v1::{combinations_hints, combinations_sets, set_hint_probabilities}};
 
+// Basic rules
+mod checks;
+// Bot solver
+mod search_v1;
+
+/// Activate feature-test mode
+pub const MODE_TEST: bool = true;
 /// Game player. True if the human player want to play and show is natural inferiority, False to let a bot play. 
-pub const GAME_HUMAN: bool = true;
+pub const MODE_GAME_HUMAN: bool = true;
+
 
 /// Define how many "colors" values there is.
 pub const POOL_SIZE: u32 = 8u32;
@@ -23,6 +31,8 @@ pub const MAX_TRIES: u32 = 8u32;
 pub const CORRECT_PLACEMENT: &str = "⚪";
 /// Graphical - What to print when a value is good.
 pub const CORRECT_VALUE: &str = "🔴";
+/// Graphical - What to print when a value is completely non-existant.
+pub const CORRECT_NON: &str = "⚫";
 
 /// Debug - Activate
 pub const DEBUG_ACTIVATED: bool = true;
@@ -90,13 +100,13 @@ pub fn game_manual() -> bool {
         }
 
         // Comparing.
-        let comparison_results: [u32; 2] = checks::similarities(&set_hidden, &user_guess_set);
+        let comparison_results: Hint = checks::similarities(&set_hidden, &user_guess_set);
         
         // UI
-        println!("{} {} {} {} - {:?}", comparison_results[0], CORRECT_PLACEMENT, comparison_results[1], CORRECT_VALUE, user_guess_set);
+        println!("{} {} {} {} - {:?}", comparison_results.exact, CORRECT_PLACEMENT, comparison_results.exist, CORRECT_VALUE, user_guess_set);
 
         // End turn.
-        found = (comparison_results[0] as usize == SET_LENGTH) | cheat_jojo;
+        found = (comparison_results.exact as usize == SET_LENGTH) | cheat_jojo;
 
         guesses += 1;
     } 
@@ -161,6 +171,28 @@ pub fn game_robot() -> bool {
 }
 */
 
+/// Enter in a state to test features and function. Disable playing.
+/// Edit directly in the code
+fn mode_test() {
+    println!("## Feature-test mode");
+
+    println!("- Recursion test");
+    let _combinations_sets: Vec<Vec<u32>> = combinations_sets();
+    let _combinations_hint: Vec<Hint> = combinations_hints();
+    // println!("Result: {:?}. # {}", _combinations_hint, _combinations_hint.len());
+    // println!("Result: {:?}. # {}", _combinations_sets, _combinations_sets.len());
+
+    println!("- Hints quantities and probabilities");
+    let _set: Vec<u32> = vec![1, 2, 3, 4];
+    println!("Set = {:?}", _set);
+    let _hint_quantities = set_hint_probabilities(&_set, &_combinations_sets, &_combinations_hint);
+    // Print hint quantities
+    println!("Hint quantities:");
+    for wh in _hint_quantities {
+        println!("- {}# {}{} {}{} {}{}", wh.weight, wh.hint.exact, CORRECT_PLACEMENT, wh.hint.exist, CORRECT_VALUE, wh.hint.null, CORRECT_NON);
+    }
+}
+
 /// Run the game, according to settings, debug and player.
 pub fn main() {
     println!("# MASTER MIND");
@@ -178,5 +210,14 @@ pub fn main() {
     println!("- Set length: {}", SET_LENGTH);
     println!("- Maximum tries: {}", MAX_TRIES);
 
-    game_manual();
+    if MODE_TEST {
+        mode_test();
+    } else if MODE_GAME_HUMAN {
+        game_manual();
+    } else if !MODE_GAME_HUMAN {
+        // game_robot()
+    } else {
+        println!("(X) - No mode selected. Exitting.");
+    }
+
 }
