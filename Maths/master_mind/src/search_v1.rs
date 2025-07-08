@@ -115,16 +115,7 @@ pub fn set_hint_quantities(set_origin: &Vec<u32>, set_combinations: &Vec<Vec<u32
 	let mut hint_quantities: HashMap<Hint, u32> = HashMap::new();
 	for set_hint in set_hints {
 		hint_quantities.insert(set_hint.clone(), 0u32);
-		//println!("q, hint_quantities: {}; h: {}{} {}{} {}{}", hint_quantities.len(), set_hint.exact, "AC", set_hint.exist, "IS", set_hint.null, "NO");
 	}
-	/*
-	println!("Hint quantities init:");
-	for (hint, weight) in &hint_quantities {
-        print!("- {}# {}{} {}{} {}{}; ", weight, hint.exact, "AC", hint.exist, "IS", hint.null, "NO");
-    }
-	println!("q-set_hints (init): {}", set_hints.len());
-	println!("q-hint_quantities (init): {}", hint_quantities.len());
-	*/
 	// Go throught all sets
 	for set in set_combinations {
 		// Compare
@@ -165,11 +156,49 @@ pub fn set_hint_score(hint_quantities: HashMap<Hint, u32>) -> HashMap<Hint, SetS
 }
 
 /// Compute the entropy of a set, given its hint score. Allow a general score.
-pub fn set_entropy(hints_score: HashMap<Hint, SetScore>) -> f64 {
+pub fn set_hint_score_entropy(hints_score: HashMap<Hint, SetScore>) -> f64 {
 	let mut entropy: f64 = 0.0f64;
 	for (_, scores) in hints_score {
 		entropy += scores.probability * scores.bits;
 	}
 
 	entropy
+}
+
+/// Comprehensive function to compute entropy of a given set.
+pub fn set_entropy(set: &Vec<u32>, combinations_sets: &Vec<Vec<u32>>, combinations_hint: &Vec<Hint>) -> f64 {
+	// Hint quantities.
+    let hint_quantities: HashMap<Hint, u32> = set_hint_quantities(&set, &combinations_sets, &combinations_hint);
+    /*
+	println!("Hint quantities:");
+    for (hint, weight) in &hint_quantities {
+        println!("- q = {} -> {}{} {}{} {}{}", weight, hint.exact, "AC", hint.exist, "IS", hint.null, "NO");
+    }
+	*/
+    // println!("q: {}", _hint_quantities.len());
+    // Hint probability.
+    let hint_score: HashMap<Hint, SetScore> = set_hint_score(hint_quantities);
+    /*
+	println!("Hint probability:");
+	for (hint, score) in &hint_score {
+        println!("- p = {:.2}%; b = {:.2}bits -> {}{} {}{} {}{}", score.probability * 100f64, score.bits,hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
+    }
+	*/
+    // Set overhaul score.
+    let entropy = set_hint_score_entropy(hint_score);
+	/*
+	println!("Entropy:");
+    println!("- E = {:.5}bits", {entropy});
+	 */
+	entropy
+}
+
+/// Compute entropy of all possible combinations given and returns a sorted HashMap.
+pub fn all_set_entropy(combinations_sets: &Vec<Vec<u32>>, combinations_hint: &Vec<Hint>) -> HashMap<Vec<u32>, f64> {
+	let mut entropies: HashMap<Vec<u32>, f64> = HashMap::new();
+	for set in combinations_sets {
+		entropies.insert(set.clone(), set_entropy(set, combinations_sets, combinations_hint));
+	}
+
+	entropies
 }

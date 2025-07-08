@@ -8,7 +8,7 @@ use rand::Rng;
 use std::io;
 use std::collections::HashMap;
 
-use crate::{checks::Hint, search_v1::{combinations_hints, combinations_sets, set_entropy, set_hint_quantities, set_hint_score, SetScore}};
+use crate::{checks::Hint, search_v1::{all_set_entropy, combinations_hints, combinations_sets, set_entropy, SetScore}};
 
 // Basic rules
 mod checks;
@@ -191,27 +191,30 @@ fn mode_test() {
     println!("Combinations of sets: {:?}. # {}", _combinations_sets, _combinations_sets.len());
     */
 
-    println!("\n### Hints quantities and probabilities");
-    let _set: Vec<u32> = vec![1, 1, 1, 1];
+    println!("\n### Entropy of a set.");
+    let _set: Vec<u32> = vec![1, 2, 3, 4];
     println!("Set = {:?}", _set);
-    // Print hint quantities
-    let _hint_quantities: HashMap<Hint, u32> = set_hint_quantities(&_set, &_combinations_sets, &_combinations_hint);
-    println!("Hint quantities:");
-    for (hint, weight) in &_hint_quantities {
-        println!("- q = {} -> {}{} {}{} {}{}", weight, hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
+
+    let _set_entropy = set_entropy(&_set, &_combinations_sets, &_combinations_hint);
+    println!("Entropy E = {:.3}", _set_entropy);
+
+    println!("\n### Entropy of all sets on first guess.");
+    let _entropies: HashMap<Vec<u32>, f64> = all_set_entropy(&_combinations_sets, &_combinations_hint);
+    print!("All entropies (E > 2): ");
+    let mut _entropy_top: f64 = 0.0;
+    let mut _entropy_top_set: Vec<Vec<u32>> = Vec::new();
+    for (_, entropy) in _entropies.clone() {
+        if entropy > _entropy_top {
+            _entropy_top = entropy;
+        }
     }
-    // println!("q: {}", _hint_quantities.len());
-    // Hint proba
-    println!("Hint probability:");
-    let _hint_score: HashMap<Hint, SetScore> = set_hint_score(_hint_quantities);
-    for (hint, score) in &_hint_score {
-        println!("- p = {:.2}%; b = {:.2}bits -> {}{} {}{} {}{}", score.probability * 100f64, score.bits,hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
+    for (set, entropy) in _entropies {
+        if entropy == _entropy_top {
+            _entropy_top_set.push(set);
+        }
     }
 
-    // Set overhaul score
-    println!("Entropy:");
-    let _entropy = set_entropy(_hint_score);
-    println!("- E = {:.5}bits", {_entropy});
+    println!("- Top: {:?} {}", _entropy_top_set, _entropy_top);
 
 }
 
