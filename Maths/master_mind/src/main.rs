@@ -5,20 +5,23 @@
 
 // Import
 use rand::Rng;
-use std::io;
+use std::{hash::Hash, io};
 use std::collections::HashMap;
 
-use crate::{checks::Hint, search_v1::{all_set_entropy, combinations_hints, combinations_sets, set_entropy, SetScore}};
+use crate::search_v1::game_robot;
+use crate::{checks::Hint, manual::game_manual, search_v1::{all_set_entropy, combinations_hints, combinations_sets, combinations_sets_matching, max_entropy, set_entropy, SetScore}};
 
-// Basic rules
+// Basic rules.
 mod checks;
-// Bot solver
+// Bot solver.
 mod search_v1;
+// Human gameplay.
+mod manual;
 
 /// Activate feature-test mode
-pub const MODE_TEST: bool = true;
+pub const MODE_TEST: bool = false;
 /// Game player. True if the human player want to play and show is natural inferiority, False to let a bot play. 
-pub const MODE_GAME_HUMAN: bool = true;
+pub const MODE_GAME_HUMAN: bool = false;
 
 
 /// Define how many "colors" values there is.
@@ -37,6 +40,8 @@ pub const CORRECT_NON: &str = "⚫";
 
 /// Debug - Activate
 pub const DEBUG_ACTIVATED: bool = true;
+/// Debug - Verbose
+pub const DEBUG_VERBOSE: bool = true;
 
 /// Generate a set. Random choices.
 pub fn generate_random_set() -> Vec<u32>{
@@ -47,151 +52,23 @@ pub fn generate_random_set() -> Vec<u32>{
     set_hidden
 }
 
-
-/// Execute the game where the human player tries to guess.
-pub fn game_manual() -> bool {
-    // Generating the set.
-    let set_hidden: Vec<u32> = generate_random_set();
-    
-
-    if DEBUG_ACTIVATED {println!("- DEBUG - Hidden set: {:?}", set_hidden);}
-
-    // User game.
-    println!("\n## Enter your guesses. Seperated by ','. Ex: `1, 2, 3, 4`.");
-
-    let mut guesses: u32 = 1;
-    let mut found: bool = false;
-
-    while guesses <= MAX_TRIES && !found {
-        // User input.
-        let mut user_guess_correct: bool = false;
-        let mut user_guess_set_string: String = String::new();
-        let mut user_guess_set: Vec<u32> = Vec::new();
-        let mut cheat_jojo: bool = false;
-
-        println!("- Guess {}", guesses);
-        while !user_guess_correct {
-            // Read
-            io::stdin()
-                .read_line(&mut user_guess_set_string)
-                .expect("(!) Warning - Couldn't read line.");
-
-            user_guess_set_string = user_guess_set_string.trim().to_string();
-            // Convert to vector
-            user_guess_set = checks::convert_input_set(user_guess_set_string.clone());
-            
-            
-            // Validate input
-            if user_guess_set.len() == SET_LENGTH {
-                user_guess_correct = true;
-            } else if DEBUG_ACTIVATED && (user_guess_set_string == String::from("jojo")) {
-                // Cheat - Instant win.
-                println!("Cheat - Instant win.");
-                cheat_jojo = true;
-                user_guess_correct = true;
-            } else if DEBUG_ACTIVATED && (user_guess_set_string == String::from("omniscia")) {
-                // Cheat - Autocorrect input.
-                println!("Cheat - Auto-correct input.");
-                user_guess_set = set_hidden.clone();
-                user_guess_correct = true;
-            } else {
-                println!("(!) Warning - Invalid input; Input difference: {}", SET_LENGTH as i32 - user_guess_set.len() as i32);
-                user_guess_set_string = String::new();
-            }
-        }
-
-        // Comparing.
-        let comparison_results: Hint = checks::similarities(&set_hidden, &user_guess_set);
-        
-        // UI
-        println!("{} {} {} {} - {:?}", comparison_results.exact, CORRECT_PLACEMENT, comparison_results.exist, CORRECT_VALUE, user_guess_set);
-
-        // End turn.
-        found = (comparison_results.exact as usize == SET_LENGTH) | cheat_jojo;
-
-        guesses += 1;
-    } 
-    println!("\n## Game ended.");
-    if found {
-        println!("- You win. GG bro.");
-    } else {
-        println!("- You lost. You ran out of tries. Take the L, bozo.");
-    }
-    println!("Hidden set was {:?}", set_hidden);
-    println!();
-
-    found
-}
-
-/// Execute the game for a bot.
-/*
-pub fn game_robot() -> bool {
-    // Generating the set.
-    let set_hidden: Vec<u32> = generate_random_set();
-    
-
-    println!("- Hidden set, to the bot: {:?}", set_hidden);
-
-    // User game.
-    println!("\n## Bot will start entering guesses.");
-
-    let mut guesses: u32 = 1;
-    let mut found: bool = false;
-
-    while guesses <= MAX_TRIES && !found {
-        // User input.
-        let mut user_guess_correct: bool = false;
-        let mut user_guess_set_string: String = String::new();
-        let mut user_guess_set: Vec<u32> = Vec::new();
-        println!("- Guess {}", guesses);
-
-        // Bot guess
-        //// Undef function.
-
-        // Comparing.
-        let comparison_results: [u32; 2] = checks::similarities(&set_hidden, &user_guess_set);
-        
-        // UI
-        println!("{} {} {} {} - {:?}", comparison_results[0], CORRECT_PLACEMENT, comparison_results[1], CORRECT_VALUE, user_guess_set);
-
-        // End turn.
-        found = comparison_results[0] as usize == SET_LENGTH;
-
-        guesses += 1;
-    } 
-    println!("\n## Game ended.");
-    if found {
-        println!("- You win. GG bro.");
-    } else {
-        println!("- You lost. You ran out of tries. Take the L, bozo.");
-    }
-    println!("Hidden set was {:?}", set_hidden);
-    println!();
-
-    found
-}
-*/
-
 /// Enter in a state to test features and function. Disable playing.
 /// Edit directly in the code
 fn mode_test() {
-    println!("## Feature-test mode");
-
-    println!("### Recursion test");
+    println!("\n## Feature-test mode"); 
     let _combinations_sets: Vec<Vec<u32>> = combinations_sets();
     let _combinations_hint: Vec<Hint> = combinations_hints();
     /*
+    println!("### Recursion test");
     println!("Combination of hints:");
     for hint in &_combinations_hint {
         println!("- {}{} {}{} {}{}", hint.exact, CORRECT_PLACEMENT, hint.exist, CORRECT_VALUE, hint.null, CORRECT_NON);
     }
     println!("q: {}", _combinations_hint.len());
-    */
-    /*
-    println!("Combinations of sets: {:?}. # {}", _combinations_sets, _combinations_sets.len());
-    */
 
-    println!("\n### Entropy of a set.");
+    println!("Combinations of sets: {:?}. # {}", _combinations_sets, _combinations_sets.len());
+
+    println!("### Entropy of a set.");
     let _set: Vec<u32> = vec![1, 2, 3, 4];
     println!("Set = {:?}", _set);
 
@@ -200,29 +77,27 @@ fn mode_test() {
 
     println!("\n### Entropy of all sets on first guess.");
     let _entropies: HashMap<Vec<u32>, f64> = all_set_entropy(&_combinations_sets, &_combinations_hint);
-    print!("All entropies (E > 2): ");
-    let mut _entropy_top: f64 = 0.0;
-    let mut _entropy_top_set: Vec<Vec<u32>> = Vec::new();
-    for (_, entropy) in _entropies.clone() {
-        if entropy > _entropy_top {
-            _entropy_top = entropy;
-        }
-    }
-    for (set, entropy) in _entropies {
-        if entropy == _entropy_top {
-            _entropy_top_set.push(set);
-        }
-    }
-
-    println!("- Top: {:?} {}", _entropy_top_set, _entropy_top);
+    print!("All entropies: ");
+    let mut _entropy_top: (Vec<Vec<u32>>, f64) = max_entropy(_entropies);
+    println!("- Top: {:?} {}", _entropy_top.0, _entropy_top.1);
+    
+    let _hint_history_1: HashMap<Vec<u32>, Hint> = HashMap::from([
+        (vec![1u32, 2u32, 3u32, 4u32], Hint { exact: 0, exist: 2, null: 2}), 
+        (vec![5u32, 6u32, 7u32, 8u32], Hint { exact: 2, exist: 0, null: 2}),
+    ]);
+    let _filtered_sets_1 = combinations_sets_matching(&_hint_history_1, &_combinations_sets);
+    println!("### Set filtering");
+    println!("1. {:?}", _filtered_sets_1);
+    */
 
 }
 
 /// Run the game, according to settings, debug and player.
 pub fn main() {
-    println!("# MASTER MIND");
+    println!("\n# MASTER MIND");
 
-    println!("## Initializing");
+    println!("\n## Initializing");
+    // Printing values
     if POOL_SIZE < 16 {
         print!("- Pool of values: 1");
         for value in 2..=POOL_SIZE {
@@ -234,13 +109,18 @@ pub fn main() {
     }
     println!("- Set length: {}", SET_LENGTH);
     println!("- Maximum tries: {}", MAX_TRIES);
+    
+    // Generating hidden set
+    let set_hidden: Vec<u32> = generate_random_set();
+    if DEBUG_ACTIVATED {println!("- DEBUG - Hidden set: {:?}", set_hidden);}
 
+    // Running game.
     if MODE_TEST {
         mode_test();
     } else if MODE_GAME_HUMAN {
-        game_manual();
+        game_manual(set_hidden);
     } else if !MODE_GAME_HUMAN {
-        // game_robot()
+        game_robot(set_hidden);
     } else {
         println!("(X) - No mode selected. Exitting.");
     }

@@ -3,8 +3,10 @@
 
 
 
+use std::hint;
+
 // Import from Main.
-use crate::{POOL_SIZE, SET_LENGTH, HashMap};
+use crate::{HashMap, DEBUG_VERBOSE, MAX_TRIES, POOL_SIZE, SET_LENGTH};
 // Import from Checks.
 use crate::{checks::{similarities, Hint}};
 
@@ -15,7 +17,7 @@ pub struct SetScore {
 }
 
 /// Generate all possible combinations of set, according to main constant's.
-/// # combinations = pool_size ^ set_length.
+/// q(combinations) = pool_size ^ set_length.
 pub fn combinations_sets() -> Vec<Vec<u32>> {
 	fn combinations_sets_inner(mut iter_global: usize) -> Vec<Vec<u32>> {
 		let mut combinations_send: Vec<Vec<u32>> = Vec::new();
@@ -51,7 +53,7 @@ pub fn combinations_sets() -> Vec<Vec<u32>> {
 }
 
 /// Generate all possible combinations of hints given, *Exact* (2), *Exist* (1), *Non-exist* (0).
-/// # combinations = 3 ^ set_length.
+/// q(combinations) = 3 ^ set_length.
 pub fn combinations_hints() -> Vec<Hint> {
 	// Generate all combinations
 	fn combinations_sets_inner(mut iter_global: usize) -> Vec<Vec<u32>> {
@@ -105,6 +107,26 @@ pub fn combinations_hints() -> Vec<Hint> {
 	}
 
 	combinations_hints
+}
+
+/// Filter from all the possible sets those who *match previous guesses*.
+pub fn combinations_sets_matching(hint_history: &HashMap<Vec<u32>, Hint>, set_combinations: &Vec<Vec<u32>>) -> Vec<Vec<u32>> {
+	let mut filtered_combinations: Vec<Vec<u32>> = Vec::new();
+	
+	// Check for all hints ever given...
+	for set in set_combinations {
+		let mut accepted: bool = true;
+		for (set_historic, hint_historic) in hint_history {
+			if similarities(set, set_historic) != *hint_historic {
+				accepted = false;
+			}
+		}
+		if accepted {
+			filtered_combinations.push(set.clone());
+		}
+	}
+
+	filtered_combinations
 }
 
 /// Find, for a given set, the number by set of hint-set that would correspond 
@@ -165,6 +187,7 @@ pub fn set_hint_score_entropy(hints_score: HashMap<Hint, SetScore>) -> f64 {
 	entropy
 }
 
+/// # Entropy of 1 set.
 /// Comprehensive function to compute entropy of a given set.
 pub fn set_entropy(set: &Vec<u32>, combinations_sets: &Vec<Vec<u32>>, combinations_hint: &Vec<Hint>) -> f64 {
 	// Hint quantities.
@@ -193,6 +216,7 @@ pub fn set_entropy(set: &Vec<u32>, combinations_sets: &Vec<Vec<u32>>, combinatio
 	entropy
 }
 
+/// # Entropy of combination of set.
 /// Compute entropy of all possible combinations given and returns a sorted HashMap.
 pub fn all_set_entropy(combinations_sets: &Vec<Vec<u32>>, combinations_hint: &Vec<Hint>) -> HashMap<Vec<u32>, f64> {
 	let mut entropies: HashMap<Vec<u32>, f64> = HashMap::new();
@@ -201,4 +225,81 @@ pub fn all_set_entropy(combinations_sets: &Vec<Vec<u32>>, combinations_hint: &Ve
 	}
 
 	entropies
+}
+
+/// Find and return a tuple of the maximum entropy and the sets reaching this entropy.
+pub fn max_entropy(entropy_map: HashMap<Vec<u32>, f64>) -> (Vec<Vec<u32>>, f64) {
+	let mut entropy_top_set: Vec<Vec<u32>> = Vec::new();
+	let mut entropy_top: f64 = 0.0;
+	// Find maximum value.
+	for (_, entropy) in entropy_map.clone() {
+        if entropy > entropy_top {
+            entropy_top = entropy;
+        }
+    }
+	// Link maximum value to actual set.
+    for (set, entropy) in entropy_map {
+        if entropy == entropy_top {
+            entropy_top_set.push(set);
+        }
+    }
+
+	(entropy_top_set, entropy_top)
+}
+
+/// # Bot main body.
+/// This function runs the main loop of the "auto-search". Returns 0 if the bot didn't manage to find, else the number of guesses it took.
+pub fn game_robot(set_hidden: Vec<u32>) -> u32 {
+	println!("\n## Robot automated game. Use DEBUG - Verbose to see what's going on.");
+	
+	// Loop until found or run out of guesses.
+	let mut guess_count: u32 = 1;
+	let mut found: bool = false;
+	let mut bug: bool = false;
+	let mut hint_history: HashMap<Vec<u32>, Hint> = HashMap::new();
+	let mut set_combinations: Vec<Vec<u32>> = combinations_sets();
+	let hint_combinations: Vec<Hint> = combinations_hints();
+
+	while guess_count <= MAX_TRIES && !found && !bug {
+		if DEBUG_VERBOSE {println!("Guess {}.", guess_count);}
+		// Calculate entropy of each possible given combination.
+		if DEBUG_VERBOSE {println!("- Entropy calculation on {} sets.", {set_combinations.len()});}
+		let set_combinations_entropy: HashMap<Vec<u32>, f64> = all_set_entropy(&set_combinations, &hint_combinations);
+		// Choose the best one, first if ex-aqueo.
+		let set_combinations_entropy_max: (Vec<Vec<u32>>, f64) = max_entropy(set_combinations_entropy.clone());
+		let set_choosen: Vec<u32>;
+		if set_combinations_entropy_max.0.len() > 0 {
+			set_choosen = set_combinations_entropy_max.0[0].clone();
+		} else {
+			bug = true;
+			panic!("(X) - Error, empty combination vector.");
+		}
+		// Guess and save the hint and set in history.
+		if DEBUG_VERBOSE {println!("- Guessing {:?}, E = {}.", set_choosen, set_combinations_entropy[&set_choosen]);}
+		let hint_given: Hint = similarities(&set_hidden, &set_choosen);
+		if hint_given.exact == 4 {
+			found = true;
+		}
+		if DEBUG_VERBOSE {println!("- Found hint: {}AC {}IS {}NO.", hint_given.exact, hint_given.exist, hint_given.null);}
+		hint_history.insert(set_choosen, hint_given);
+		
+
+		// Create and filter the vector of possible combinations with history.
+		if DEBUG_VERBOSE {println!("- Refining combinations.");}
+		set_combinations = combinations_sets_matching(&hint_history, &set_combinations);
+
+		guess_count += 1;
+	}
+	// Game end
+	if found {
+		guess_count -= 1;
+		if DEBUG_VERBOSE {println!("Victory ! in {} guesses.", guess_count);}
+	} else if bug {
+		if DEBUG_VERBOSE {println!("(!) - Something wrong happend; no more info.");}
+	} else {
+		if DEBUG_VERBOSE {println!("Loose ! after {} guesses.", guess_count);}
+		guess_count = 0;
+	}
+
+	guess_count
 }
