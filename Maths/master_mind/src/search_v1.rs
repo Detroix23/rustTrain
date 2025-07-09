@@ -3,10 +3,10 @@
 
 
 
-use std::hint;
+
 
 // Import from Main.
-use crate::{HashMap, DEBUG_VERBOSE, MAX_TRIES, POOL_SIZE, SET_LENGTH};
+use crate::{Duration, HashMap, Instant, UiLevel, DEBUG_LOG_TIME, MAX_TRIES, POOL_SIZE, SET_LENGTH, UI_HINTS, UI_SHOW};
 // Import from Checks.
 use crate::{checks::{similarities, Hint}};
 
@@ -250,7 +250,7 @@ pub fn max_entropy(entropy_map: HashMap<Vec<u32>, f64>) -> (Vec<Vec<u32>>, f64) 
 /// # Bot main body.
 /// This function runs the main loop of the "auto-search". Returns 0 if the bot didn't manage to find, else the number of guesses it took.
 pub fn game_robot(set_hidden: Vec<u32>) -> u32 {
-	println!("\n## Robot automated game. Use DEBUG - Verbose to see what's going on.");
+	println!("\n## Robot automated game. Set UI_SHOW to change what you see.");
 	
 	// Loop until found or run out of guesses.
 	let mut guess_count: u32 = 1;
@@ -261,9 +261,10 @@ pub fn game_robot(set_hidden: Vec<u32>) -> u32 {
 	let hint_combinations: Vec<Hint> = combinations_hints();
 
 	while guess_count <= MAX_TRIES && !found && !bug {
-		if DEBUG_VERBOSE {println!("Guess {}.", guess_count);}
+		if UI_SHOW == UiLevel::All {println!("Guess {}.", guess_count);}
+		let t1: Instant = Instant::now();
 		// Calculate entropy of each possible given combination.
-		if DEBUG_VERBOSE {println!("- Entropy calculation on {} sets.", {set_combinations.len()});}
+		if UI_SHOW == UiLevel::All {println!("- Entropy calculation on {} sets.", {set_combinations.len()});}
 		let set_combinations_entropy: HashMap<Vec<u32>, f64> = all_set_entropy(&set_combinations, &hint_combinations);
 		// Choose the best one, first if ex-aqueo.
 		let set_combinations_entropy_max: (Vec<Vec<u32>>, f64) = max_entropy(set_combinations_entropy.clone());
@@ -275,29 +276,33 @@ pub fn game_robot(set_hidden: Vec<u32>) -> u32 {
 			panic!("(X) - Error, empty combination vector.");
 		}
 		// Guess and save the hint and set in history.
-		if DEBUG_VERBOSE {println!("- Guessing {:?}, E = {}.", set_choosen, set_combinations_entropy[&set_choosen]);}
+		if UI_SHOW == UiLevel::All {println!("- Guessing {:?}, E = {}.", set_choosen, set_combinations_entropy[&set_choosen]);}
 		let hint_given: Hint = similarities(&set_hidden, &set_choosen);
 		if hint_given.exact == 4 {
 			found = true;
 		}
-		if DEBUG_VERBOSE {println!("- Found hint: {}AC {}IS {}NO.", hint_given.exact, hint_given.exist, hint_given.null);}
+		if UI_SHOW == UiLevel::All {println!("- Found hint: {}{} {}{} {}{}.", hint_given.exact, UI_HINTS.exact, hint_given.exist, UI_HINTS.exist, hint_given.null, UI_HINTS.null);}
 		hint_history.insert(set_choosen, hint_given);
 		
 
 		// Create and filter the vector of possible combinations with history.
-		if DEBUG_VERBOSE {println!("- Refining combinations.");}
+		if UI_SHOW == UiLevel::All {println!("- Refining combinations.");}
 		set_combinations = combinations_sets_matching(&hint_history, &set_combinations);
+
+		// Count elapsed time
+		let d1: Duration  = t1.elapsed();
+		if DEBUG_LOG_TIME {println!("- Time elapsed: t = {:.2?}", d1);}
 
 		guess_count += 1;
 	}
 	// Game end
 	if found {
 		guess_count -= 1;
-		if DEBUG_VERBOSE {println!("Victory ! in {} guesses.", guess_count);}
+		if UI_SHOW == UiLevel::All {println!("Victory ! in {} guesses.", guess_count);}
 	} else if bug {
-		if DEBUG_VERBOSE {println!("(!) - Something wrong happend; no more info.");}
+		if UI_SHOW == UiLevel::All {println!("(!) - Something wrong happend; no more info.");}
 	} else {
-		if DEBUG_VERBOSE {println!("Loose ! after {} guesses.", guess_count);}
+		if UI_SHOW == UiLevel::All {println!("Loose ! after {} guesses.", guess_count);}
 		guess_count = 0;
 	}
 

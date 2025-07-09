@@ -5,9 +5,11 @@
 
 // Import
 use rand::Rng;
-use std::{hash::Hash, io};
 use std::collections::HashMap;
+use std::time::Instant;
+use std::time::Duration;
 
+use crate::manual::game_assist;
 use crate::search_v1::game_robot;
 use crate::{checks::Hint, manual::game_manual, search_v1::{all_set_entropy, combinations_hints, combinations_sets, combinations_sets_matching, max_entropy, set_entropy, SetScore}};
 
@@ -17,31 +19,56 @@ mod checks;
 mod search_v1;
 // Human gameplay.
 mod manual;
+// Benchmark
+mod benchmark;
 
 /// Activate feature-test mode
 pub const MODE_TEST: bool = false;
-/// Game player. True if the human player want to play and show is natural inferiority, False to let a bot play. 
-pub const MODE_GAME_HUMAN: bool = false;
+/// Game player. Assist means that the human plays, but with the hints of the computer.
+#[derive(PartialEq)]
+pub enum ModePlayer {
+    Robot,
+    RobotBenchmark,
+    Human,
+    Assist
+}
+pub const MODE_PLAYER: ModePlayer = ModePlayer::Assist;
 
 
 /// Define how many "colors" values there is.
-pub const POOL_SIZE: u32 = 8u32;
+pub const POOL_SIZE: u32 = 9u32;
 /// Define the length of the hidden set.
 pub const SET_LENGTH: usize = 4usize;
 /// Define the maximum amount of tries availabes
-pub const MAX_TRIES: u32 = 8u32;
+pub const MAX_TRIES: u32 = 1024u32;
 
-/// Graphical - What to print when guess is correct and well placed.
-pub const CORRECT_PLACEMENT: &str = "⚪";
-/// Graphical - What to print when a value is good.
-pub const CORRECT_VALUE: &str = "🔴";
-/// Graphical - What to print when a value is completely non-existant.
-pub const CORRECT_NON: &str = "⚫";
+/// Graphical - Define hint types for UI.
+pub struct UiHints<'a> {
+    exact: &'a str,
+    exist: &'a str,
+    null: &'a str
+}
+/// Graphical - What to print for hint types.
+pub const UI_HINTS: UiHints = UiHints {
+    exact: "⚪",
+    exist: "🔴",
+    null: "⚫",
+};
 
-/// Debug - Activate
+/// Graphical - Define kinds of info to show.
+#[derive(PartialEq)]
+pub enum UiLevel {
+    All,
+    Minimal,
+    None
+}
+/// Graphical - How much info to actually show.
+pub const UI_SHOW: UiLevel = UiLevel::All;
+
+/// Debug - Activate.
 pub const DEBUG_ACTIVATED: bool = true;
-/// Debug - Verbose
-pub const DEBUG_VERBOSE: bool = true;
+/// Debug - Log time
+pub const DEBUG_LOG_TIME: bool = true;
 
 /// Generate a set. Random choices.
 pub fn generate_random_set() -> Vec<u32>{
@@ -117,10 +144,12 @@ pub fn main() {
     // Running game.
     if MODE_TEST {
         mode_test();
-    } else if MODE_GAME_HUMAN {
+    } else if MODE_PLAYER == ModePlayer::Human {
         game_manual(set_hidden);
-    } else if !MODE_GAME_HUMAN {
+    } else if MODE_PLAYER == ModePlayer::Robot {
         game_robot(set_hidden);
+    } else if MODE_PLAYER == ModePlayer::Assist {
+        game_assist(set_hidden);
     } else {
         println!("(X) - No mode selected. Exitting.");
     }
