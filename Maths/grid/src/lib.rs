@@ -2,17 +2,31 @@
 // Main file for the Detoix's grid module.
 // It allows multiple structured grid of various type.
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Tile {
-    x: i32,
-    y: i32,
-    state: bool,
+    pub x: i32,
+    pub y: i32,
+    pub state: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct Size {
+    pub x: usize,
+    pub y: usize,
+}
+
+#[derive(Debug, Clone)]
 pub struct Grid {
-    div: String,
-    tiles: Vec<Tile>,
+    pub div: String,
+    pub tiles: Vec<Tile>,
+    pub size: Size,
+}
+
+#[derive(PartialEq)]
+pub enum TileState {
+    On,
+    Off,
+    Void,
 }
 
 // Constants
@@ -23,18 +37,19 @@ pub const FIXED_SIZE: bool = true;
 pub const GRID_SIZE: usize = 20;
 /// UI - Grid visualisation
 pub struct UiTiles<'a> {
-    on: &'a str,
-    off: &'a str,
-    void: &'a str,
+    pub on: &'a str,
+    pub off: &'a str,
+    pub void: &'a str,
 }
 /// UI - Grid to print chars
-pub const UI_TILES: UiTiles = UiTiles {
+pub const DEFAULT_UI_TILES: UiTiles = UiTiles {
     on: "#",
     off: "0",
     void: "."
 };
 
-/// Create a grid
+/// # Create a grid
+/// Need a size for creating a square grid and default fill state.
 pub fn grid_init(div: String, size: usize, default_state: bool) -> Grid {
     let mut tiles: Vec<Tile> = Vec::new();
     for x in 0..size {
@@ -49,12 +64,17 @@ pub fn grid_init(div: String, size: usize, default_state: bool) -> Grid {
     let grid: Grid = Grid {
         div,
         tiles,
+        size: Size {
+            x: size,
+            y: size,
+        },
     };
 
     grid
 }
 
-/// Use to push tiles into a grid. This function prevents to have multiple tiles with the same coord - the first will cancel any other.
+/// # Use to push tiles into a grid. 
+/// This function prevents to have multiple tiles with the same coord - the first will cancel any other.
 pub fn add_tiles(tiles_in: Vec<Tile>) -> Vec<Tile> {
     let mut tiles_out: Vec<Tile> = Vec::new();
     for tile_in in tiles_in {
@@ -70,8 +90,39 @@ pub fn add_tiles(tiles_in: Vec<Tile>) -> Vec<Tile> {
     tiles_out
 }
 
-/// Debug grid visualization
-fn grid_inline(grid: Grid) {
+/// # Get state of a tile of a grid
+/// 
+pub fn grid_state_tile(grid: &Grid, x: i32, y:i32) -> TileState {
+    for tile in &grid.tiles {
+        if tile.x == x && tile.y == y {
+            if tile.state == true {
+                return TileState::On
+            } else {
+                return TileState::Off
+            }
+        }
+    }
+
+    TileState::Void
+}
+
+// # Update a tile of the grid
+pub fn grid_update_tile(grid: Grid, x: i32, y:i32, state: bool) -> Grid {
+    let mut grid_updated: Grid = grid.clone();
+    for tile in &grid.tiles {
+        if tile.x == x && tile.y == y {
+            let tile_index: usize = grid.tiles.iter().position(|t| t == tile).expect("(X) - Tile somehow not found.");
+            grid_updated.tiles[tile_index].state = state;
+        }
+    }
+
+    grid_updated
+}
+
+/// # Debug grid visualization
+/// Allow to print inline the grid in complement with more info.
+/// Use "DEFAULT_UI_TILES" to satisfy local_ui_tiles.
+pub fn grid_inline(grid: Grid, local_ui_tiles: UiTiles) {
     let grid_size: usize = GRID_SIZE;
     // Find maximums
     let mut max_x: i32 = 0;
@@ -99,38 +150,42 @@ fn grid_inline(grid: Grid) {
                 let tile = &grid.tiles[i];
                 if tile.x == x as i32 && tile.y == y as i32 {
                     if tile.state {
-                        print!("{}", UI_TILES.on);
+                        print!("{}", local_ui_tiles.on);
                     } else {
-                        print!("{}", UI_TILES.off);
+                        print!("{}", local_ui_tiles.off);
                     }
                     found = true;
                 }
                 i += 1;
             }
             if !found {
-                print!("{}", UI_TILES.void);
+                print!("{}", local_ui_tiles.void);
             }
         }
         println!();
     }
 }
 
-fn main() {
+/// # Test function.
+/// Uselesss on its own.
+pub fn test_main() {
     let tiles_to_add: Vec<Tile> = vec![
             Tile{x: 0, y: 0, state: true},
             Tile{x: 0, y: 1, state: true},
             Tile{x: 0, y: 1, state: true},
             Tile{x: 0, y: -1, state: true},
     ];
+    // Manual grid creation. ** Don't do that **.
     let grid_cartesian1: Grid = Grid {
         div: String::from("1sq"),
         tiles: add_tiles(tiles_to_add),
+        size: Size { x: 1, y: 3 }
     };
     println!("Grid 1: {:?}", grid_cartesian1);
-    grid_inline(grid_cartesian1);
+    grid_inline(grid_cartesian1, DEFAULT_UI_TILES);
 
     println!("Grid 2");
     let mut grid_cartesian2: Grid = grid_init(String::from("1sq"), GRID_SIZE, false);
     grid_cartesian2.tiles.remove(34);
-    grid_inline(grid_cartesian2);
+    grid_inline(grid_cartesian2, DEFAULT_UI_TILES);
 }
